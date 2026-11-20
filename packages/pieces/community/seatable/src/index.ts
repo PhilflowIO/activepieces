@@ -9,6 +9,7 @@ import { listRowsAction } from './lib/actions/list-rows';
 import { updateRowAction } from './lib/actions/update-row';
 import { seatableAuth, seatableConnection } from './lib/auth';
 import { seatableClient } from './lib/common/client';
+import { newRowTrigger } from './lib/triggers/new-row';
 
 export const seatable = createPiece({
   displayName: 'SeaTable',
@@ -42,5 +43,5 @@ export const seatable = createPiece({
       },
     }),
   ],
-  triggers: [],
+  triggers: [newRowTrigger],
 });
