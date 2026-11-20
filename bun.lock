@@ -8337,6 +8337,20 @@
         "tslib": "2.6.2",
       },
     },
+    "packages/pieces/community/seatable": {
+      "name": "@activepieces/piece-seatable",
+      "version": "0.0.1",
+      "dependencies": {
+        "@activepieces/core-piece-types": "workspace:*",
+        "@activepieces/core-utils": "workspace:*",
+        "@activepieces/pieces-common": "workspace:*",
+        "@activepieces/pieces-framework": "workspace:*",
+      },
+      "devDependencies": {
+        "tslib": "2.6.2",
+        "vitest": "5.0.5",
+      },
+    },
     "packages/pieces/community/seek-table": {
       "name": "@activepieces/piece-seek-table",
       "version": "0.0.9",
@@ -12794,6 +12808,8 @@
     "@activepieces/piece-scrapegrapghai": ["@activepieces/piece-scrapegrapghai@workspace:packages/pieces/community/scrapegrapghai"],
 
     "@activepieces/piece-scrapeless": ["@activepieces/piece-scrapeless@workspace:packages/pieces/community/scrapeless"],
+
+    "@activepieces/piece-seatable": ["@activepieces/piece-seatable@workspace:packages/pieces/community/seatable"],
 
     "@activepieces/piece-seek-table": ["@activepieces/piece-seek-table@workspace:packages/pieces/community/seek-table"],
 
