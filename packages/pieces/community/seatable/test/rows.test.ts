@@ -21,6 +21,30 @@ describe('seatableRows.toWritableValues', () => {
   });
 });
 
+describe('seatableRows.searchableColumns', () => {
+  it('offers only columns an equality search can match', () => {
+    expect(seatableRows.searchableColumns(columns).map((column) => column.name)).toEqual(['Name', 'Age', 'Status']);
+  });
+});
+
+describe('seatableRows.toFilterValue', () => {
+  it('sends numbers for number columns and text for the others', () => {
+    expect(seatableRows.toFilterValue({ column: columns[1], value: ' 41 ' })).toBe(41);
+    expect(seatableRows.toFilterValue({ column: columns[0], value: '41' })).toBe('41');
+  });
+
+  it('rejects a non-numeric value for a number column', () => {
+    expect(() => seatableRows.toFilterValue({ column: columns[1], value: 'forty' })).toThrow('must be a number');
+  });
+});
+
+describe('seatableRows.quoteIdentifier', () => {
+  it('quotes names with spaces and refuses backticks', () => {
+    expect(seatableRows.quoteIdentifier('Sales Leads')).toBe('`Sales Leads`');
+    expect(() => seatableRows.quoteIdentifier('a`b')).toThrow('backtick');
+  });
+});
+
 describe('seatableRows.findTable', () => {
   it('names the missing table', () => {
     expect(() => seatableRows.findTable({ tables: [], name: 'Contacts' })).toThrow('Table "Contacts" was not found');

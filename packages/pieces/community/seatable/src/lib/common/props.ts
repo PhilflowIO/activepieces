@@ -5,6 +5,8 @@ import { seatableRows } from './rows';
 
 export const seatableProps = {
   table,
+  view,
+  searchColumn,
   rowId,
   rowFields,
 };
@@ -23,6 +25,52 @@ function table() {
       return loadOptions(async () => {
         const tables = await listTables(seatableConnection.toProps(auth));
         return tables.map((candidate) => ({ label: candidate.name, value: candidate.name }));
+      });
+    },
+  });
+}
+
+function view() {
+  return Property.Dropdown({
+    auth: seatableAuth,
+    displayName: 'View',
+    description: 'Only return the rows and columns of this view. Leave empty for the whole table.',
+    required: false,
+    refreshers: ['table'],
+    options: async ({ auth, table }) => {
+      if (!auth) {
+        return disabled('Connect your SeaTable base first');
+      }
+      if (typeof table !== 'string' || table === '') {
+        return disabled('Select a table first');
+      }
+      return loadOptions(async () => {
+        const tables = await listTables(seatableConnection.toProps(auth));
+        const views = seatableRows.findTable({ tables, name: table }).views ?? [];
+        return views.map((candidate) => ({ label: candidate.name, value: candidate.name }));
+      });
+    },
+  });
+}
+
+function searchColumn() {
+  return Property.Dropdown({
+    auth: seatableAuth,
+    displayName: 'Column',
+    description: 'The column to search in.',
+    required: true,
+    refreshers: ['table'],
+    options: async ({ auth, table }) => {
+      if (!auth) {
+        return disabled('Connect your SeaTable base first');
+      }
+      if (typeof table !== 'string' || table === '') {
+        return disabled('Select a table first');
+      }
+      return loadOptions(async () => {
+        const tables = await listTables(seatableConnection.toProps(auth));
+        const columns = seatableRows.searchableColumns(seatableRows.findTable({ tables, name: table }).columns);
+        return columns.map((column) => ({ label: column.name, value: column.name }));
       });
     },
   });

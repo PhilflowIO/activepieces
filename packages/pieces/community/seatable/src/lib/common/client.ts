@@ -52,6 +52,20 @@ async function connect(auth: SeaTableAuthProps): Promise<SeaTableBase> {
         path: `/rows/${encodeURIComponent(rowId)}/`,
         query: { table_name: table, convert_keys: 'true' },
       }),
+    listRows: async ({ table, view, start, limit }) => {
+      const response = await call<{ rows: SeaTableRow[] }>({
+        method: HttpMethod.GET,
+        path: '/rows/',
+        query: {
+          table_name: table,
+          convert_keys: 'true',
+          start: String(start),
+          limit: String(limit),
+          ...(isNil(view) || view === '' ? {} : { view_name: view }),
+        },
+      });
+      return response.rows;
+    },
     appendRow: async ({ table, row }) => {
       const response = await call<{ row_ids: { _id: string }[] }>({
         method: HttpMethod.POST,
@@ -78,6 +92,14 @@ async function connect(auth: SeaTableAuthProps): Promise<SeaTableBase> {
         body: { table_name: table, row_ids: [rowId] },
       });
       return response.deleted_rows;
+    },
+    query: async ({ sql, parameters }) => {
+      const response = await call<{ results: SeaTableRow[] }>({
+        method: HttpMethod.POST,
+        path: '/sql/',
+        body: { sql, parameters, convert_keys: true },
+      });
+      return response.results;
     },
   };
 }
@@ -159,9 +181,11 @@ export type SeaTableBase = {
   call: <T>(params: CallParams) => Promise<T>;
   listTables: () => Promise<SeaTableTable[]>;
   getRow: (params: { table: string; rowId: string }) => Promise<SeaTableRow>;
+  listRows: (params: { table: string; view?: string; start: number; limit: number }) => Promise<SeaTableRow[]>;
   appendRow: (params: { table: string; row: Record<string, unknown> }) => Promise<string>;
   updateRow: (params: { table: string; rowId: string; row: Record<string, unknown> }) => Promise<void>;
   deleteRow: (params: { table: string; rowId: string }) => Promise<number>;
+  query: (params: { sql: string; parameters: (string | number)[] }) => Promise<SeaTableRow[]>;
 };
 
 type CallParams = {
