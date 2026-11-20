@@ -1,6 +1,10 @@
 import { createCustomApiCallAction } from '@activepieces/pieces-common';
 import { PieceCategory, createPiece } from '@activepieces/pieces-framework';
+import { createRowAction } from './lib/actions/create-row';
+import { deleteRowAction } from './lib/actions/delete-row';
 import { getBaseSchemaAction } from './lib/actions/get-base-schema';
+import { getRowAction } from './lib/actions/get-row';
+import { updateRowAction } from './lib/actions/update-row';
 import { seatableAuth, seatableConnection } from './lib/auth';
 import { seatableClient } from './lib/common/client';
 
@@ -13,6 +17,10 @@ export const seatable = createPiece({
   auth: seatableAuth,
   authors: ['PhilflowIO'],
   actions: [
+    createRowAction,
+    getRowAction,
+    updateRowAction,
+    deleteRowAction,
     getBaseSchemaAction,
     createCustomApiCallAction({
       auth: seatableAuth,

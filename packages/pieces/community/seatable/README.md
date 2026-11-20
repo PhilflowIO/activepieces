@@ -1,3 +1,3 @@
 # pieces-seatable
 
-SeaTable piece: read the base schema and make custom API calls. Works with SeaTable Cloud and self-hosted SeaTable Server.
+SeaTable piece: create, get, update and delete rows, read the base schema. Works with SeaTable Cloud and self-hosted SeaTable Server.

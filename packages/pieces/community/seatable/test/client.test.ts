@@ -32,17 +32,19 @@ describe('seatableClient.connect', () => {
     const spy = vi
       .spyOn(httpClient, 'sendRequest')
       .mockResolvedValueOnce(ok(access))
-      .mockResolvedValueOnce(ok({ metadata: { tables: [{ _id: '0000', name: 'Contacts', columns: [] }] } }));
+      .mockResolvedValueOnce(ok({ _id: 'row1', Name: 'Ada' }));
     const base = await seatableClient.connect(auth);
-    expect((await base.listTables()).map((table) => table.name)).toEqual(['Contacts']);
+    const row = await base.getRow({ table: 'Contacts', rowId: 'row 1' });
+    expect(row).toEqual({ _id: 'row1', Name: 'Ada' });
     expect(spy.mock.calls[0][0]).toMatchObject({
       method: HttpMethod.GET,
       url: 'https://seatable.acme.test/api/v2.1/dtable/app-access-token/',
       headers: { Authorization: 'Bearer api-token' },
     });
     expect(spy.mock.calls[1][0]).toMatchObject({
-      url: 'https://seatable.acme.test/api-gateway/api/v2/dtables/650d8a0d-7e27-46a8-8b18-6cc6f3db2057/metadata/',
+      url: 'https://seatable.acme.test/api-gateway/api/v2/dtables/650d8a0d-7e27-46a8-8b18-6cc6f3db2057/rows/row%201/',
       headers: { Authorization: 'Bearer base-token' },
+      queryParams: { table_name: 'Contacts', convert_keys: 'true' },
     });
   });
 
@@ -59,5 +61,18 @@ describe('seatableClient.connect', () => {
     expect(failure).toBeInstanceOf(SeaTableApiError);
     expect(failure).toMatchObject({ status: 403 });
     expect(String(failure)).toContain('SeaTable returned an error (403). Permission denied. Check the API token');
+  });
+
+  it('returns the id of an appended row and sends one row per call', async () => {
+    const spy = vi
+      .spyOn(httpClient, 'sendRequest')
+      .mockResolvedValueOnce(ok(access))
+      .mockResolvedValueOnce(ok({ inserted_row_count: 1, row_ids: [{ _id: 'new-row' }] }));
+    const base = await seatableClient.connect(auth);
+    expect(await base.appendRow({ table: 'Contacts', row: { Name: 'Ada' } })).toBe('new-row');
+    expect(spy.mock.calls[1][0]).toMatchObject({
+      method: HttpMethod.POST,
+      body: { table_name: 'Contacts', rows: [{ Name: 'Ada' }] },
+    });
   });
 });

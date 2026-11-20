@@ -46,6 +46,39 @@ async function connect(auth: SeaTableAuthProps): Promise<SeaTableBase> {
       });
       return response.metadata.tables;
     },
+    getRow: ({ table, rowId }) =>
+      call<SeaTableRow>({
+        method: HttpMethod.GET,
+        path: `/rows/${encodeURIComponent(rowId)}/`,
+        query: { table_name: table, convert_keys: 'true' },
+      }),
+    appendRow: async ({ table, row }) => {
+      const response = await call<{ row_ids: { _id: string }[] }>({
+        method: HttpMethod.POST,
+        path: '/rows/',
+        body: { table_name: table, rows: [row] },
+      });
+      const created = response.row_ids[0];
+      if (isNil(created)) {
+        throw new Error('SeaTable did not return the ID of the new row.');
+      }
+      return created._id;
+    },
+    updateRow: async ({ table, rowId, row }) => {
+      await call<unknown>({
+        method: HttpMethod.PUT,
+        path: '/rows/',
+        body: { table_name: table, updates: [{ row_id: rowId, row }] },
+      });
+    },
+    deleteRow: async ({ table, rowId }) => {
+      const response = await call<{ deleted_rows: number }>({
+        method: HttpMethod.DELETE,
+        path: '/rows/',
+        body: { table_name: table, row_ids: [rowId] },
+      });
+      return response.deleted_rows;
+    },
   };
 }
 
@@ -103,6 +136,8 @@ export type SeaTableAuthProps = {
   apiToken: string;
 };
 
+export type SeaTableRow = Record<string, unknown> & { _id: string };
+
 export type SeaTableColumn = {
   key: string;
   name: string;
@@ -123,6 +158,10 @@ export type SeaTableBase = {
   baseName: string;
   call: <T>(params: CallParams) => Promise<T>;
   listTables: () => Promise<SeaTableTable[]>;
+  getRow: (params: { table: string; rowId: string }) => Promise<SeaTableRow>;
+  appendRow: (params: { table: string; row: Record<string, unknown> }) => Promise<string>;
+  updateRow: (params: { table: string; rowId: string; row: Record<string, unknown> }) => Promise<void>;
+  deleteRow: (params: { table: string; rowId: string }) => Promise<number>;
 };
 
 type CallParams = {
