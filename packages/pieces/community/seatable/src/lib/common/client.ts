@@ -38,6 +38,16 @@ async function connect(auth: SeaTableAuthProps): Promise<SeaTableBase> {
   if (access.use_api_gateway === false) {
     throw new Error('This SeaTable server is older than version 5.0. Upgrade it to use this piece.');
   }
+  const gatewayHost = hostOf(access.dtable_server);
+  if (isNil(gatewayHost)) {
+    throw new Error(`SeaTable sent an API gateway address that is not a link (${access.dtable_server}).`);
+  }
+  const serverHost = new URL(server).host;
+  if (gatewayHost !== serverHost) {
+    throw new Error(
+      `This SeaTable server sends data through a separate address (${gatewayHost}). Only servers whose API gateway is on the same address as the server URL (${serverHost}) are supported. Ask your SeaTable administrator to serve the API gateway at ${server}/api-gateway/, which is the default.`,
+    );
+  }
   return {
     accessToken: access.access_token,
     baseUuid: access.dtable_uuid,
@@ -118,6 +128,14 @@ async function query({ base, sql, parameters }: QueryParams): Promise<SeaTableRo
 
 function call<T>(base: SeaTableBase, { method, path, query, body }: CallParams): Promise<T> {
   return send<T>({ method, url: `${base.gatewayUrl}${path}`, token: base.accessToken, query, body });
+}
+
+function hostOf(value: string): string | undefined {
+  try {
+    return new URL(value).host;
+  } catch {
+    return undefined;
+  }
 }
 
 async function send<T>({ method, url, token, query, body }: SendParams): Promise<T> {

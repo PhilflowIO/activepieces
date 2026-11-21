@@ -48,6 +48,28 @@ describe('seatableClient.connect', () => {
     });
   });
 
+  it('accepts a gateway on the server address however SeaTable writes it', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, dtable_server: 'https://SeaTable.acme.test:443/api-gateway' }));
+    await expect(seatableClient.connect(auth)).resolves.toMatchObject({ baseUuid: access.dtable_uuid, baseName: 'CRM' });
+  });
+
+  it('names the separate address when the API gateway is on another host', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, dtable_server: 'https://gateway.acme.test/api-gateway/' }));
+    await expect(seatableClient.connect(auth)).rejects.toThrow(
+      'This SeaTable server sends data through a separate address (gateway.acme.test)',
+    );
+  });
+
+  it('treats another port as another address', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, dtable_server: 'https://seatable.acme.test:8443/api-gateway/' }));
+    await expect(seatableClient.connect(auth)).rejects.toThrow('separate address (seatable.acme.test:8443)');
+  });
+
+  it('refuses a gateway address that is not a link', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, dtable_server: 'api-gateway' }));
+    await expect(seatableClient.connect(auth)).rejects.toThrow('SeaTable sent an API gateway address that is not a link');
+  });
+
   it('refuses servers without the API gateway', async () => {
     vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, use_api_gateway: false }));
     await expect(seatableClient.connect(auth)).rejects.toThrow('older than version 5.0');
