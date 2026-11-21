@@ -17,7 +17,7 @@ export const getBaseSchemaAction = createAction({
   props: {},
   async run(context) {
     const base = await seatableClient.connect(seatableConnection.toProps(context.auth));
-    const tables = await base.listTables();
+    const tables = await seatableClient.listTables({ base });
     return {
       base_uuid: base.baseUuid,
       base_name: base.baseName,
