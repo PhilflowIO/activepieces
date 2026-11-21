@@ -212,14 +212,45 @@ describe('the connection', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('tests the token against the current user', async () => {
-    const spy = vi.spyOn(httpClient, 'sendRequest').mockResolvedValue(ok({ login: 'raven' }));
+  // The sandbox bot token of #15017: issue scope only, no read:user.
+  function issueScopeOnly() {
+    return vi.spyOn(httpClient, 'sendRequest').mockImplementation(async (request) => {
+      if (request.url === `${API}/user`) {
+        throw new HttpError({}, { status: 403, responseBody: { message: 'token does not have at least one of required scope(s): [read:user]' } });
+      }
+      return ok([]);
+    });
+  }
+
+  it('accepts a token with exactly the scopes its help asks for, without read:user', async () => {
+    const spy = issueScopeOnly();
     await expect(validate(props)).resolves.toEqual({ valid: true });
-    expect(requests(spy)).toEqual([expect.objectContaining({ method: HttpMethod.GET, url: `${API}/user` })]);
+    expect(requests(spy)).toEqual([expect.objectContaining({
+      method: HttpMethod.GET,
+      url: `${API}/repos/issues/search`,
+      queryParams: { limit: '1' },
+    })]);
   });
 
-  it('reports a refused token as invalid', async () => {
-    vi.spyOn(httpClient, 'sendRequest').mockRejectedValue(new HttpError({}, { status: 401, responseBody: {} }));
-    await expect(validate(props)).resolves.toMatchObject({ valid: false, error: expect.stringContaining('(401)') });
+  it('names the connection by its host when the token may not read the user', async () => {
+    issueScopeOnly();
+    await expect(forgejoAuth.getConnectionIdentifier!({ auth: props } as never)).resolves.toBe('git.acme.test');
+  });
+
+  it('names the connection by account and host when the token may read the user', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValue(ok({ login: 'raven' }));
+    await expect(forgejoAuth.getConnectionIdentifier!({ auth: props } as never)).resolves.toBe('raven (git.acme.test)');
+  });
+
+  it('lets a refused token and a token without the issue scope leave with their status', async () => {
+    for (const status of [401, 403]) {
+      vi.spyOn(httpClient, 'sendRequest').mockRejectedValueOnce(new HttpError({}, { status, responseBody: {} }));
+      await expect(validate(props)).rejects.toMatchObject({ name: 'ForgejoApiError', status });
+    }
+  });
+
+  it('reports any other failure as invalid', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockRejectedValue(new HttpError({}, { status: 404, responseBody: {} }));
+    await expect(validate(props)).resolves.toMatchObject({ valid: false, error: expect.stringContaining('(404)') });
   });
 });
