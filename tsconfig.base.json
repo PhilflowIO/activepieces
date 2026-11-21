@@ -542,6 +542,9 @@
       "@activepieces/piece-foreplay-co": [
         "packages/pieces/community/foreplay-co/src/index.ts"
       ],
+      "@activepieces/piece-forgejo": [
+        "packages/pieces/community/forgejo/src/index.ts"
+      ],
       "@activepieces/piece-formbricks": [
         "packages/pieces/community/formbricks/src/index.ts"
       ],

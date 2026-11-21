@@ -3469,6 +3469,20 @@
         "vitest": "5.0.5",
       },
     },
+    "packages/pieces/community/forgejo": {
+      "name": "@activepieces/piece-forgejo",
+      "version": "0.0.2",
+      "dependencies": {
+        "@activepieces/core-piece-types": "workspace:*",
+        "@activepieces/core-utils": "workspace:*",
+        "@activepieces/pieces-common": "workspace:*",
+        "@activepieces/pieces-framework": "workspace:*",
+      },
+      "devDependencies": {
+        "tslib": "2.6.2",
+        "vitest": "5.0.5",
+      },
+    },
     "packages/pieces/community/formbricks": {
       "name": "@activepieces/piece-formbricks",
       "version": "0.4.1",
@@ -12096,6 +12110,8 @@
     "@activepieces/piece-folk": ["@activepieces/piece-folk@workspace:packages/pieces/community/folk"],
 
     "@activepieces/piece-foreplay-co": ["@activepieces/piece-foreplay-co@workspace:packages/pieces/community/foreplay-co"],
+
+    "@activepieces/piece-forgejo": ["@activepieces/piece-forgejo@workspace:packages/pieces/community/forgejo"],
 
     "@activepieces/piece-formbricks": ["@activepieces/piece-formbricks@workspace:packages/pieces/community/formbricks"],
 
