@@ -22,6 +22,6 @@ export const getRowAction = createAction({
   async run(context) {
     const { table, rowId } = context.propsValue;
     const base = await seatableClient.connect(seatableConnection.toProps(context.auth));
-    return base.getRow({ table, rowId: rowId.trim() });
+    return seatableClient.getRow({ base, table, rowId: rowId.trim() });
   },
 });

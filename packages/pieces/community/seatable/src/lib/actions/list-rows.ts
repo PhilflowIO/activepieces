@@ -34,7 +34,8 @@ export const listRowsAction = createAction({
   async run(context) {
     const { table, view, limit, offset } = context.propsValue;
     const base = await seatableClient.connect(seatableConnection.toProps(context.auth));
-    return base.listRows({
+    return seatableClient.listRows({
+      base,
       table,
       view: view ?? undefined,
       start: Math.max(0, Math.floor(offset ?? 0)),

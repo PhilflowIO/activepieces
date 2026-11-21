@@ -23,8 +23,8 @@ export const createRowAction = createAction({
   async run(context) {
     const { table, fields } = context.propsValue;
     const base = await seatableClient.connect(seatableConnection.toProps(context.auth));
-    const columns = seatableRows.findTable({ tables: await base.listTables(), name: table }).columns;
-    const rowId = await base.appendRow({ table, row: seatableRows.toWritableValues({ columns, values: fields ?? {} }) });
-    return base.getRow({ table, rowId });
+    const columns = seatableRows.findTable({ tables: await seatableClient.listTables({ base }), name: table }).columns;
+    const rowId = await seatableClient.appendRow({ base, table, row: seatableRows.toWritableValues({ columns, values: fields ?? {} }) });
+    return seatableClient.getRow({ base, table, rowId });
   },
 });

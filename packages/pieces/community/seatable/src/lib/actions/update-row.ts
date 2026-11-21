@@ -25,11 +25,11 @@ export const updateRowAction = createAction({
     const { table, rowId, fields } = context.propsValue;
     const id = rowId.trim();
     const base = await seatableClient.connect(seatableConnection.toProps(context.auth));
-    const columns = seatableRows.findTable({ tables: await base.listTables(), name: table }).columns;
+    const columns = seatableRows.findTable({ tables: await seatableClient.listTables({ base }), name: table }).columns;
     const row = seatableRows.toWritableValues({ columns, values: fields ?? {} });
     if (Object.keys(row).length > 0) {
-      await base.updateRow({ table, rowId: id, row });
+      await seatableClient.updateRow({ base, table, rowId: id, row });
     }
-    return base.getRow({ table, rowId: id });
+    return seatableClient.getRow({ base, table, rowId: id });
   },
 });
