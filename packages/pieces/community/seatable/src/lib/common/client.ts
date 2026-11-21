@@ -14,6 +14,13 @@ export class SeaTableApiError extends Error {
 export const seatableClient = {
   serverUrl,
   connect,
+  listTables,
+  getRow,
+  listRows,
+  appendRow,
+  updateRow,
+  deleteRow,
+  query,
 };
 
 function serverUrl(auth: SeaTableAuthProps): string {
@@ -22,86 +29,113 @@ function serverUrl(auth: SeaTableAuthProps): string {
 }
 
 async function connect(auth: SeaTableAuthProps): Promise<SeaTableBase> {
+  const server = serverUrl(auth);
   const access = await send<AppAccessToken>({
     method: HttpMethod.GET,
-    url: `${serverUrl(auth)}/api/v2.1/dtable/app-access-token/`,
+    url: `${server}/api/v2.1/dtable/app-access-token/`,
     token: auth.apiToken.trim(),
   });
   if (access.use_api_gateway === false) {
     throw new Error('This SeaTable server is older than version 5.0. Upgrade it to use this piece.');
   }
-  const gatewayUrl = `${access.dtable_server.replace(/\/+$/, '')}/api/v2/dtables/${access.dtable_uuid}`;
-  const call = <T>({ method, path, query, body }: CallParams): Promise<T> =>
-    send<T>({ method, url: `${gatewayUrl}${path}`, token: access.access_token, query, body });
-
+  const gatewayHost = hostOf(access.dtable_server);
+  if (isNil(gatewayHost)) {
+    throw new Error(`SeaTable sent an API gateway address that is not a link (${access.dtable_server}).`);
+  }
+  const serverHost = new URL(server).host;
+  if (gatewayHost !== serverHost) {
+    throw new Error(
+      `This SeaTable server sends data through a separate address (${gatewayHost}). Only servers whose API gateway is on the same address as the server URL (${serverHost}) are supported. Ask your SeaTable administrator to serve the API gateway at ${server}/api-gateway/, which is the default.`,
+    );
+  }
   return {
     accessToken: access.access_token,
     baseUuid: access.dtable_uuid,
     baseName: access.dtable_name,
-    call,
-    listTables: async () => {
-      const response = await call<{ metadata: { tables: SeaTableTable[] } }>({
-        method: HttpMethod.GET,
-        path: '/metadata/',
-      });
-      return response.metadata.tables;
-    },
-    getRow: ({ table, rowId }) =>
-      call<SeaTableRow>({
-        method: HttpMethod.GET,
-        path: `/rows/${encodeURIComponent(rowId)}/`,
-        query: { table_name: table, convert_keys: 'true' },
-      }),
-    listRows: async ({ table, view, start, limit }) => {
-      const response = await call<{ rows: SeaTableRow[] }>({
-        method: HttpMethod.GET,
-        path: '/rows/',
-        query: {
-          table_name: table,
-          convert_keys: 'true',
-          start: String(start),
-          limit: String(limit),
-          ...(isNil(view) || view === '' ? {} : { view_name: view }),
-        },
-      });
-      return response.rows;
-    },
-    appendRow: async ({ table, row }) => {
-      const response = await call<{ row_ids: { _id: string }[] }>({
-        method: HttpMethod.POST,
-        path: '/rows/',
-        body: { table_name: table, rows: [row] },
-      });
-      const created = response.row_ids[0];
-      if (isNil(created)) {
-        throw new Error('SeaTable did not return the ID of the new row.');
-      }
-      return created._id;
-    },
-    updateRow: async ({ table, rowId, row }) => {
-      await call<unknown>({
-        method: HttpMethod.PUT,
-        path: '/rows/',
-        body: { table_name: table, updates: [{ row_id: rowId, row }] },
-      });
-    },
-    deleteRow: async ({ table, rowId }) => {
-      const response = await call<{ deleted_rows: number }>({
-        method: HttpMethod.DELETE,
-        path: '/rows/',
-        body: { table_name: table, row_ids: [rowId] },
-      });
-      return response.deleted_rows;
-    },
-    query: async ({ sql, parameters }) => {
-      const response = await call<{ results: SeaTableRow[] }>({
-        method: HttpMethod.POST,
-        path: '/sql/',
-        body: { sql, parameters, convert_keys: true },
-      });
-      return response.results;
-    },
+    gatewayUrl: `${access.dtable_server.replace(/\/+$/, '')}/api/v2/dtables/${access.dtable_uuid}`,
   };
+}
+
+async function listTables({ base }: { base: SeaTableBase }): Promise<SeaTableTable[]> {
+  const response = await call<{ metadata: { tables: SeaTableTable[] } }>(base, {
+    method: HttpMethod.GET,
+    path: '/metadata/',
+  });
+  return response.metadata.tables;
+}
+
+function getRow({ base, table, rowId }: { base: SeaTableBase; table: string; rowId: string }): Promise<SeaTableRow> {
+  return call<SeaTableRow>(base, {
+    method: HttpMethod.GET,
+    path: `/rows/${encodeURIComponent(rowId)}/`,
+    query: { table_name: table, convert_keys: 'true' },
+  });
+}
+
+async function listRows({ base, table, view, start, limit }: ListRowsParams): Promise<SeaTableRow[]> {
+  const response = await call<{ rows: SeaTableRow[] }>(base, {
+    method: HttpMethod.GET,
+    path: '/rows/',
+    query: {
+      table_name: table,
+      convert_keys: 'true',
+      start: String(start),
+      limit: String(limit),
+      ...(isNil(view) || view === '' ? {} : { view_name: view }),
+    },
+  });
+  return response.rows;
+}
+
+async function appendRow({ base, table, row }: { base: SeaTableBase; table: string; row: Record<string, unknown> }): Promise<string> {
+  const response = await call<{ row_ids: { _id: string }[] }>(base, {
+    method: HttpMethod.POST,
+    path: '/rows/',
+    body: { table_name: table, rows: [row] },
+  });
+  const created = response.row_ids[0];
+  if (isNil(created)) {
+    throw new Error('SeaTable did not return the ID of the new row.');
+  }
+  return created._id;
+}
+
+async function updateRow({ base, table, rowId, row }: UpdateRowParams): Promise<void> {
+  await call<unknown>(base, {
+    method: HttpMethod.PUT,
+    path: '/rows/',
+    body: { table_name: table, updates: [{ row_id: rowId, row }] },
+  });
+}
+
+async function deleteRow({ base, table, rowId }: { base: SeaTableBase; table: string; rowId: string }): Promise<number> {
+  const response = await call<{ deleted_rows: number }>(base, {
+    method: HttpMethod.DELETE,
+    path: '/rows/',
+    body: { table_name: table, row_ids: [rowId] },
+  });
+  return response.deleted_rows;
+}
+
+async function query({ base, sql, parameters }: QueryParams): Promise<SeaTableRow[]> {
+  const response = await call<{ results: SeaTableRow[] }>(base, {
+    method: HttpMethod.POST,
+    path: '/sql/',
+    body: { sql, parameters, convert_keys: true },
+  });
+  return response.results;
+}
+
+function call<T>(base: SeaTableBase, { method, path, query, body }: CallParams): Promise<T> {
+  return send<T>({ method, url: `${base.gatewayUrl}${path}`, token: base.accessToken, query, body });
+}
+
+function hostOf(value: string): string | undefined {
+  try {
+    return new URL(value).host;
+  } catch {
+    return undefined;
+  }
 }
 
 async function send<T>({ method, url, token, query, body }: SendParams): Promise<T> {
@@ -178,15 +212,14 @@ export type SeaTableBase = {
   accessToken: string;
   baseUuid: string;
   baseName: string;
-  call: <T>(params: CallParams) => Promise<T>;
-  listTables: () => Promise<SeaTableTable[]>;
-  getRow: (params: { table: string; rowId: string }) => Promise<SeaTableRow>;
-  listRows: (params: { table: string; view?: string; start: number; limit: number }) => Promise<SeaTableRow[]>;
-  appendRow: (params: { table: string; row: Record<string, unknown> }) => Promise<string>;
-  updateRow: (params: { table: string; rowId: string; row: Record<string, unknown> }) => Promise<void>;
-  deleteRow: (params: { table: string; rowId: string }) => Promise<number>;
-  query: (params: { sql: string; parameters: (string | number)[] }) => Promise<SeaTableRow[]>;
+  gatewayUrl: string;
 };
+
+type ListRowsParams = { base: SeaTableBase; table: string; view?: string; start: number; limit: number };
+
+type UpdateRowParams = { base: SeaTableBase; table: string; rowId: string; row: Record<string, unknown> };
+
+type QueryParams = { base: SeaTableBase; sql: string; parameters: (string | number)[] };
 
 type CallParams = {
   method: HttpMethod;

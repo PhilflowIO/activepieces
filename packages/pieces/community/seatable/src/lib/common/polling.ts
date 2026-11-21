@@ -26,10 +26,11 @@ async function poll({ auth, table, store }: PollParams): Promise<SeaTableRow[]> 
     await store.put(STATE_KEY, await currentState({ base, table }));
     return [];
   }
-  const rows = await base.query(
+  const rows = await seatableClient.query(
     isNil(state.since)
-      ? { sql: `SELECT * FROM ${seatableRows.quoteIdentifier(table)} ORDER BY _ctime ASC LIMIT ${MAX_ROWS}`, parameters: [] }
+      ? { base, sql: `SELECT * FROM ${seatableRows.quoteIdentifier(table)} ORDER BY _ctime ASC LIMIT ${MAX_ROWS}`, parameters: [] }
       : {
+          base,
           sql: `SELECT * FROM ${seatableRows.quoteIdentifier(table)} WHERE _ctime >= ? ORDER BY _ctime ASC LIMIT ${MAX_ROWS}`,
           parameters: [new Date(state.since).toISOString()],
         },
@@ -41,7 +42,8 @@ async function poll({ auth, table, store }: PollParams): Promise<SeaTableRow[]> 
 
 async function test({ auth, table }: { auth: SeaTableAuthProps; table: string }): Promise<SeaTableRow[]> {
   const base = await seatableClient.connect(auth);
-  return base.query({
+  return seatableClient.query({
+    base,
     sql: `SELECT * FROM ${seatableRows.quoteIdentifier(table)} ORDER BY _ctime DESC LIMIT ${TEST_ROWS}`,
     parameters: [],
   });
@@ -49,12 +51,13 @@ async function test({ auth, table }: { auth: SeaTableAuthProps; table: string })
 
 async function currentState({ base, table }: { base: SeaTableBase; table: string }): Promise<PollingState> {
   const quoted = seatableRows.quoteIdentifier(table);
-  const newest = await base.query({ sql: `SELECT _id, _ctime FROM ${quoted} ORDER BY _ctime DESC LIMIT 1`, parameters: [] });
+  const newest = await seatableClient.query({ base, sql: `SELECT _id, _ctime FROM ${quoted} ORDER BY _ctime DESC LIMIT 1`, parameters: [] });
   const since = createdAt(newest[0]);
   if (isNil(since)) {
     return initialState({ rows: [] });
   }
-  const sameMoment = await base.query({
+  const sameMoment = await seatableClient.query({
+    base,
     sql: `SELECT _id, _ctime FROM ${quoted} WHERE _ctime >= ? ORDER BY _ctime ASC LIMIT ${MAX_ROWS}`,
     parameters: [new Date(since).toISOString()],
   });
@@ -83,7 +86,7 @@ function advance({ state, rows, full }: { state: PollingState; rows: SeaTableRow
   const newest = stamped.reduce((latest, row) => Math.max(latest, row.created), state.since ?? Number.NEGATIVE_INFINITY);
   const nothingNew = stamped.every((row) => !isNil(state.seen[row.id]));
   if (full && nothingNew) {
-    return { since: newest + 1, seen: {} };
+    return { since: newest + SECOND, seen: {} };
   }
   const known = { ...state.seen, ...Object.fromEntries(stamped.map((row) => [row.id, row.created])) };
   const seen = Object.fromEntries(Object.entries(known).filter(([, created]) => created === newest));
@@ -96,10 +99,11 @@ function createdAt(row: SeaTableRow | undefined): number | undefined {
     return undefined;
   }
   const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  return Number.isNaN(parsed) ? undefined : Math.floor(parsed / SECOND) * SECOND;
 }
 
 const STATE_KEY = 'new_row_state';
+const SECOND = 1000;
 const MAX_ROWS = 1000;
 const TEST_ROWS = 5;
 

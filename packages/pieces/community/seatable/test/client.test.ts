@@ -34,7 +34,7 @@ describe('seatableClient.connect', () => {
       .mockResolvedValueOnce(ok(access))
       .mockResolvedValueOnce(ok({ _id: 'row1', Name: 'Ada' }));
     const base = await seatableClient.connect(auth);
-    const row = await base.getRow({ table: 'Contacts', rowId: 'row 1' });
+    const row = await seatableClient.getRow({ base, table: 'Contacts', rowId: 'row 1' });
     expect(row).toEqual({ _id: 'row1', Name: 'Ada' });
     expect(spy.mock.calls[0][0]).toMatchObject({
       method: HttpMethod.GET,
@@ -46,6 +46,28 @@ describe('seatableClient.connect', () => {
       headers: { Authorization: 'Bearer base-token' },
       queryParams: { table_name: 'Contacts', convert_keys: 'true' },
     });
+  });
+
+  it('accepts a gateway on the server address however SeaTable writes it', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, dtable_server: 'https://SeaTable.acme.test:443/api-gateway' }));
+    await expect(seatableClient.connect(auth)).resolves.toMatchObject({ baseUuid: access.dtable_uuid, baseName: 'CRM' });
+  });
+
+  it('names the separate address when the API gateway is on another host', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, dtable_server: 'https://gateway.acme.test/api-gateway/' }));
+    await expect(seatableClient.connect(auth)).rejects.toThrow(
+      'This SeaTable server sends data through a separate address (gateway.acme.test)',
+    );
+  });
+
+  it('treats another port as another address', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, dtable_server: 'https://seatable.acme.test:8443/api-gateway/' }));
+    await expect(seatableClient.connect(auth)).rejects.toThrow('separate address (seatable.acme.test:8443)');
+  });
+
+  it('refuses a gateway address that is not a link', async () => {
+    vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ ...access, dtable_server: 'api-gateway' }));
+    await expect(seatableClient.connect(auth)).rejects.toThrow('SeaTable sent an API gateway address that is not a link');
   });
 
   it('refuses servers without the API gateway', async () => {
@@ -69,10 +91,46 @@ describe('seatableClient.connect', () => {
       .mockResolvedValueOnce(ok(access))
       .mockResolvedValueOnce(ok({ inserted_row_count: 1, row_ids: [{ _id: 'new-row' }] }));
     const base = await seatableClient.connect(auth);
-    expect(await base.appendRow({ table: 'Contacts', row: { Name: 'Ada' } })).toBe('new-row');
+    expect(await seatableClient.appendRow({ base, table: 'Contacts', row: { Name: 'Ada' } })).toBe('new-row');
     expect(spy.mock.calls[1][0]).toMatchObject({
       method: HttpMethod.POST,
       body: { table_name: 'Contacts', rows: [{ Name: 'Ada' }] },
+    });
+  });
+});
+
+describe('seatableClient row calls', () => {
+  const base = {
+    accessToken: 'base-token',
+    baseUuid: access.dtable_uuid,
+    baseName: 'CRM',
+    gatewayUrl: 'https://seatable.acme.test/api-gateway/api/v2/dtables/650d8a0d-7e27-46a8-8b18-6cc6f3db2057',
+  };
+
+  it('reads with GET only', async () => {
+    const spy = vi
+      .spyOn(httpClient, 'sendRequest')
+      .mockResolvedValueOnce(ok({ metadata: { tables: [] } }))
+      .mockResolvedValueOnce(ok({ _id: 'row1' }))
+      .mockResolvedValueOnce(ok({ rows: [] }));
+    await seatableClient.listTables({ base });
+    await seatableClient.getRow({ base, table: 'Contacts', rowId: 'row1' });
+    await seatableClient.listRows({ base, table: 'Contacts', view: 'Leads', start: 0, limit: 10 });
+    expect(spy.mock.calls.map(([request]) => request.method)).toEqual([HttpMethod.GET, HttpMethod.GET, HttpMethod.GET]);
+    expect(spy.mock.calls[2][0]).toMatchObject({
+      url: `${base.gatewayUrl}/rows/`,
+      queryParams: { table_name: 'Contacts', convert_keys: 'true', start: '0', limit: '10', view_name: 'Leads' },
+    });
+  });
+
+  it('sends a parameterised SQL query with column names', async () => {
+    const spy = vi.spyOn(httpClient, 'sendRequest').mockResolvedValueOnce(ok({ results: [{ _id: 'row1' }] }));
+    const rows = await seatableClient.query({ base, sql: 'SELECT * FROM `Contacts` WHERE `Email` = ? LIMIT 1', parameters: ['ada@example.com'] });
+    expect(rows).toEqual([{ _id: 'row1' }]);
+    expect(spy.mock.calls[0][0]).toMatchObject({
+      method: HttpMethod.POST,
+      url: `${base.gatewayUrl}/sql/`,
+      body: { sql: 'SELECT * FROM `Contacts` WHERE `Email` = ? LIMIT 1', parameters: ['ada@example.com'], convert_keys: true },
     });
   });
 });

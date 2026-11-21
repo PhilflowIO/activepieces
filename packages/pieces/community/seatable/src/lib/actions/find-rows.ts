@@ -34,13 +34,14 @@ export const findRowsAction = createAction({
   async run(context) {
     const { table, column, value, limit } = context.propsValue;
     const base = await seatableClient.connect(seatableConnection.toProps(context.auth));
-    const columns = seatableRows.findTable({ tables: await base.listTables(), name: table }).columns;
+    const columns = seatableRows.findTable({ tables: await seatableClient.listTables({ base }), name: table }).columns;
     const target = columns.find((candidate) => candidate.name === column);
     if (!target) {
       throw new Error(`Column "${column}" was not found in table "${table}".`);
     }
     const count = Math.min(MAX_ROWS, Math.max(1, Math.floor(limit ?? 10)));
-    return base.query({
+    return seatableClient.query({
+      base,
       sql: `SELECT * FROM ${seatableRows.quoteIdentifier(table)} WHERE ${seatableRows.quoteIdentifier(target.name)} = ? LIMIT ${count}`,
       parameters: [seatableRows.toFilterValue({ column: target, value })],
     });

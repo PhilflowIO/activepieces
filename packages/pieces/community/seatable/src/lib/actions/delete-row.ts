@@ -23,7 +23,7 @@ export const deleteRowAction = createAction({
     const { table, rowId } = context.propsValue;
     const id = rowId.trim();
     const base = await seatableClient.connect(seatableConnection.toProps(context.auth));
-    const deleted = await base.deleteRow({ table, rowId: id });
+    const deleted = await seatableClient.deleteRow({ base, table, rowId: id });
     return { row_id: id, deleted: deleted > 0 };
   },
 });

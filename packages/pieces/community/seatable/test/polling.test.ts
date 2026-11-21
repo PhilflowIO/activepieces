@@ -71,7 +71,12 @@ describe('newRowPolling.advance', () => {
 
   it('steps past a full page of rows that were all emitted, so the trigger never stalls on one second', () => {
     const rows = [row({ id: 'a', ctime: '2026-11-20T10:00:00Z' })];
-    expect(newRowPolling.advance({ state: { since: T0, seen: { a: T0 } }, rows, full: true })).toEqual({ since: T0 + 1, seen: {} });
+    expect(newRowPolling.advance({ state: { since: T0, seen: { a: T0 } }, rows, full: true })).toEqual({ since: T0 + 1000, seen: {} });
+  });
+
+  it('counts creation times by the second, because SeaTable drops the milliseconds of some rows', () => {
+    const rows = [row({ id: 'a', ctime: '2026-11-20T10:00:00.849Z' }), row({ id: 'b', ctime: '2026-11-20T10:00:00Z' })];
+    expect(newRowPolling.advance({ state: { since: null, seen: {} }, rows, full: false })).toEqual({ since: T0, seen: { a: T0, b: T0 } });
   });
 });
 
@@ -95,6 +100,17 @@ describe('newRowPolling end to end', () => {
     vi.restoreAllMocks();
     seatable([[row({ id: 'old', ctime: '2026-11-20T11:00:00+01:00' }), row({ id: 'new', ctime: '2026-11-20T11:00:00+01:00' })]]);
     expect(await newRowPolling.poll({ auth, table: 'Contacts', store })).toEqual([]);
+  });
+
+  it('fires for a row created in the same second as a row SeaTable stamped with milliseconds', async () => {
+    const store = memoryStore();
+    seatable([[row({ id: 'old', ctime: '2026-11-20T11:00:00.849+01:00' })], [row({ id: 'old', ctime: '2026-11-20T11:00:00.849+01:00' })]]);
+    await newRowPolling.onEnable({ auth, table: 'Contacts', store });
+    vi.restoreAllMocks();
+    const spy = seatable([[row({ id: 'old', ctime: '2026-11-20T11:00:00.849+01:00' }), row({ id: 'new', ctime: '2026-11-20T11:00:00+01:00' })]]);
+    const fired = await newRowPolling.poll({ auth, table: 'Contacts', store });
+    expect(fired.map((item) => item._id)).toEqual(['new']);
+    expect(spy.mock.calls[1][0].body).toMatchObject({ parameters: ['2026-11-20T10:00:00.000Z'] });
   });
 
   it('fires for every row of a table that was empty when enabled', async () => {

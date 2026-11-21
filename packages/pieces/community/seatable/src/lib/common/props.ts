@@ -128,7 +128,7 @@ function columnProperty(column: SeaTableColumn) {
 
 async function listTables(auth: SeaTableAuthProps): Promise<SeaTableTable[]> {
   const base = await seatableClient.connect(auth);
-  return base.listTables();
+  return seatableClient.listTables({ base });
 }
 
 async function loadOptions(load: () => Promise<{ label: string; value: string }[]>): Promise<DropdownState<string>> {
