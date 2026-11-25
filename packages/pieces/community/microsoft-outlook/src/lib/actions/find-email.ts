@@ -2,6 +2,7 @@ import { createAction, Property } from '@activepieces/pieces-framework';
 import { PageCollection } from '@microsoft/microsoft-graph-client';
 import { Message } from '@microsoft/microsoft-graph-types';
 import dayjs from 'dayjs';
+import { outlookAtomicCommon } from '../common/atomic-common';
 import { microsoftOutlookAuth } from '../common/auth';
 import { outlookCommon } from '../common/client';
 import { mailFolderIdDropdown } from '../common/props';
@@ -45,7 +46,7 @@ export const findEmailAction = createAction({
 		const client = outlookCommon.createClient(context.auth);
 
 		const baseUrl = folderId ? `${outlookCommon.mailboxPrefix(context.auth)}/mailFolders/${folderId}/messages` : `${outlookCommon.mailboxPrefix(context.auth)}/messages`;
-		const searchParam = `$search="${searchQuery}"`;
+		const searchParam = `$search=${outlookAtomicCommon.encodeSearchQuery(searchQuery)}`;
 		const topParam = top ? `$top=${Math.min(Math.max(top, 1), 1000)}` : '$top=25';
 
 		const queryParams = [searchParam, topParam].filter(Boolean).join('&');

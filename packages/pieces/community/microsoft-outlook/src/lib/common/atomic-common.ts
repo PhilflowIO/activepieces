@@ -34,6 +34,11 @@ function encodeGraphId(id: string): string {
 	return encodeURIComponent(id.trim());
 }
 
+function encodeSearchQuery(query: string): string {
+	const escaped = query.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+	return encodeURIComponent(`"${escaped}"`);
+}
+
 function isGovernmentCloud(auth: OAuth2PropertyValue): boolean {
 	return ((auth.props?.['cloud'] as string | undefined) ?? '').includes('.us');
 }
@@ -236,6 +241,7 @@ export const outlookAtomicCommon = {
 	isAppOnlyConnection,
 	isGovernmentCloud,
 	encodeGraphId,
+	encodeSearchQuery,
 	graphStatusCode,
 	graphErrorCode,
 	graphErrorDetail,
